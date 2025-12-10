@@ -1,0 +1,199 @@
+import asyncio
+import os
+import re
+from abc import ABC, abstractmethod
+from playwright.async_api import async_playwright, Page, BrowserContext, Browser, TimeoutError
+from typing import Optional
+import logging
+from . import config
+
+logger = logging.getLogger(__name__)
+
+# Abstract client interface 
+
+class IWebDriverClient(ABC):
+    @abstractmethod
+    async def click(self, selector: str) -> None:
+        """Clicks on an element specified by the selector."""
+        pass
+
+    @abstractmethod
+    async def type(self, selector: str, text: str) -> None:
+        """Fills an input field specified by the selector."""
+        pass
+
+    @abstractmethod
+    async def get_by_placeholder(self, text: str) -> 'Locator':
+        """Gets a locator for an element with the given placeholder text."""
+        pass
+
+    @abstractmethod
+    async def locator(self, selector: str) -> 'Locator':
+        """Gets a locator for an element specified by the selector"""
+        pass
+
+    @abstractmethod
+    async def start_session(self, headless: bool = True) -> None:
+        """Starts the browser session and navigates to the protected URL."""
+        pass
+
+    @abstractmethod
+    async def close(self) -> None:
+        """Closes the browser and saves state."""
+        pass
+
+
+
+class DeepSeekClient(IWebDriverClient):
+    """
+    A Playwright client wrapper for DeepSeek interaction logic.
+    Implements IWebDriverClient for architectural flexibility.
+    """
+    def __init__(
+        self,
+        storage_state_path: str,
+        protected_page_url: str,
+        paragraph_selector: str,
+        last_paragraph_selector: str,
+        input_placeholder: str,
+        button_combo_selector: str,
+        timeout_seconds: int = 60,
+        stability_delay: int = 10
+    ):
+        self.STORAGE_STATE_PATH = storage_state_path
+        self.PROTECTED_PAGE_URL = protected_page_url
+        self.PARAGRAPH_SELECTOR = paragraph_selector
+        self.LAST_PARAGRAPH_SELECTOR = last_paragraph_selector
+        self.INPUT_PLACEHOLDER = input_placeholder
+        self.BUTTON_COMBO_SELECTOR = button_combo_selector
+        self.TIMEOUT_SECONDS = timeout_seconds
+        self.STABILITY_DELAY = stability_delay
+
+        self.playwright = None
+        self.browser: Optional[Browser] = None
+        self.context: Optional[BrowserContext] = None
+        self.page: Optional[Page] = None
+        self.lock = asyncio.Lock()
+
+
+    async def click(self, selector: str) -> None:
+        if not self.page: raise RuntimeError("Session not started.")
+        await self.page.click(selector)
+
+    async def type(self, selector: str, text: str) -> None:
+        if not self.page: raise RuntimeError("Session not started.")
+        await self.page.fill(selector, text)
+
+    async def get_by_placeholder(self, text: str) -> 'Locator':
+        if not self.page: raise RuntimeError("Session not started.")
+        return self.page.get_by_placeholder(text)
+
+    async def locator(self, selector: str) -> 'Locator':
+        if not self.page: raise RuntimeError("Session not started.")
+        return self.page.locator(selector)
+
+    async def start_session(self, url=None, headless=False):
+        if url is None:
+            url = self.PROTECTED_PAGE_URL
+        if not os.path.exists(self.STORAGE_STATE_PATH):
+            logger.info("<=> You are not logged, trying log in...")
+            from .auth import Auth
+            auth_cl = Auth(**config.auth_config) 
+            await auth_cl.login()
+            return await self.start_session(url=url, headless=headless)
+            
+            
+
+
+        self.playwright = await async_playwright().start()
+        self.browser = await self.playwright.firefox.launch(headless=headless)
+        self.context = await self.browser.new_context(storage_state=self.STORAGE_STATE_PATH)
+        self.page = await self.context.new_page()
+        await self.page.goto(url)
+
+    async def close(self):
+        if self.context:
+            await self.context.storage_state(path=self.STORAGE_STATE_PATH)
+        if self.browser:
+            await self.browser.close()
+        if self.playwright:
+            await self.playwright.stop()
+
+
+    # --- DeepSeek Logic Specific Methods ---
+
+    async def wait_for_stable_response(self, start_paragraph_count: int) -> str:
+        if not self.page: raise RuntimeError("Session not started.")
+
+        new_paragraph = self.page.locator(self.PARAGRAPH_SELECTOR).nth(start_paragraph_count)
+        
+        try:
+            # Wait for the next paragraph element to appear
+            await new_paragraph.wait_for(state="visible", timeout=50000)
+        except TimeoutError:
+            return "\n Timed out waiting for a new response (50s timeout)."
+        except Exception as e:
+            return f"\nCritical error: {e}"
+
+        import time
+        start_time = time.time()
+        last_text = ""
+        stable_since = 0
+        last_paragraph = self.page.locator(self.LAST_PARAGRAPH_SELECTOR).last
+
+        while time.time() - start_time < self.TIMEOUT_SECONDS:
+            try:
+                current_text = await last_paragraph.inner_text()
+                if current_text != last_text:
+                    last_text = current_text
+                    stable_since = time.time()
+                if time.time() - stable_since >= self.STABILITY_DELAY and current_text != "":
+                    break
+                await asyncio.sleep(0.5)
+            except Exception:
+                await asyncio.sleep(0.5)
+                pass
+
+        if time.time() - start_time >= self.TIMEOUT_SECONDS:
+            return f"\nText did not stabilize within {self.TIMEOUT_SECONDS}s."
+
+        all_paragraphs = await self.page.locator(self.PARAGRAPH_SELECTOR).all_inner_texts()
+        new_response = "\n".join(all_paragraphs[start_paragraph_count:])
+            
+        elements = await self.page.locator(".ds-markdown pre code").all()
+        for i, el in enumerate(elements):
+            text = await el.inner_text()
+
+        cleaned = re.sub(r'<[^>]+>', '', new_response)
+        cleaned = re.sub(r'^```[a-zA-Z]*\n?', '', cleaned)
+        cleaned = re.sub(r'\n?```$', '', cleaned)
+        cleaned = cleaned.strip()
+
+        return cleaned
+    
+    async def send_message(self, message: str) -> str:
+        async with self.lock:
+            if not self.page:
+                raise RuntimeError("Session not started. Use start_session().")
+
+            current_count = await (await self.locator(self.PARAGRAPH_SELECTOR)).count()
+            input_field = self.page.get_by_placeholder(self.INPUT_PLACEHOLDER)
+            send_button = self.page.locator(self.BUTTON_COMBO_SELECTOR)
+
+            await input_field.fill(message)
+            await send_button.click()
+
+
+            response = await self.wait_for_stable_response(current_count)
+            return response
+
+
+
+class DeepSeekFlow:
+    # This class depends only on the IWebDriverClient interface
+    def __init__(self, client: IWebDriverClient):
+        self.client = client
+        
+    async def run_query(self, query: str) -> str:
+        return await self.client.send_message(query)
+
