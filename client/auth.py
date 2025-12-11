@@ -7,7 +7,7 @@ from .ds_cli import DeepSeekClient
 
 from playwright.async_api import async_playwright
 import logging
-from . import config
+
 
 
 logger = logging.getLogger(__name__)

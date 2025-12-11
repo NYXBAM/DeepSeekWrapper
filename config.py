@@ -1,3 +1,8 @@
+import os
+from dotenv import load_dotenv
+
+
+load_dotenv()
 
 
 CONFIG = {
@@ -17,8 +22,8 @@ CONFIG = {
 auth_config = {
     'storage_state_path': "storage/storage_state.json",
     'login_url': 'https://chat.deepseek.com/sign_in',
-    'login': "YOUR_EMAIL_OR_PHONE_HERE",
-    'password': 'YOUR_PASSWORD_HERE',
+    'login': os.getenv("DEEPSEEK_LOGIN"),
+    'password': os.getenv("DEEPSEEK_PASSWORD"),
     'user_input_placeholder': "Phone number / email address",
     'password_input_placeholder': "Password",
     'unique_class': ".ds-sign-up-form__register-button"

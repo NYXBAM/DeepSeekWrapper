@@ -5,7 +5,8 @@ from abc import ABC, abstractmethod
 from playwright.async_api import async_playwright, Page, BrowserContext, Browser, TimeoutError
 from typing import Optional
 import logging
-from . import config
+
+import config
 
 logger = logging.getLogger(__name__)
 

@@ -2,8 +2,8 @@ import asyncio
 import os
 
 from client.ds_cli import DeepSeekClient, DeepSeekFlow
-from client.config import CONFIG
-# import client as DS
+from config import CONFIG
+
 
 async def main():
     
