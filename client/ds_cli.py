@@ -58,9 +58,11 @@ class DeepSeekClient(IWebDriverClient):
         last_paragraph_selector: str,
         input_placeholder: str,
         button_combo_selector: str,
+        external_browser = None,
         timeout_seconds: int = 60,
         stability_delay: int = 10
     ):
+        self.external_browser = external_browser
         self.STORAGE_STATE_PATH = storage_state_path
         self.PROTECTED_PAGE_URL = protected_page_url
         self.PARAGRAPH_SELECTOR = paragraph_selector
@@ -101,16 +103,22 @@ class DeepSeekClient(IWebDriverClient):
             from .auth import Auth
             auth_cl = Auth(**config.auth_config) 
             await auth_cl.login()
-            return await self.start_session(url=url, headless=headless)
             
+        if self.external_browser is None:
+            self.playwright = await async_playwright().start()
+            self.browser = await self.playwright.firefox.launch(headless=headless)
+        else:
+            self.browser = self.external_browser
             
-
-
-        self.playwright = await async_playwright().start()
-        self.browser = await self.playwright.firefox.launch(headless=headless)
         self.context = await self.browser.new_context(storage_state=self.STORAGE_STATE_PATH)
         self.page = await self.context.new_page()
         await self.page.goto(url)
+    
+    @classmethod
+    async def create_browser(cls, headless=True):
+        pw = await async_playwright().start()
+        browser = await pw.firefox.launch(headless=headless)
+        return pw, browser
 
     async def close(self):
         if self.context:
