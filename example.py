@@ -8,15 +8,20 @@ async def single_client_example():
     Example 1: Single DeepSeekClient usage.
     Classic flow with one client, one session.
     """
-    client = DeepSeekClient(**CONFIG)
-    try:
-        await client.start_session(headless=True)
-        flow = DeepSeekFlow(client=client)
-        response = await flow.run_query("Hi, who are you?")
-        print("Single client response:\n", response)
-    except Exception as e:
-        print("Error in single client example:", e)
+    # OLD implementation
+    # client = DeepSeekClient(**CONFIG)
+    # try:
+    #     await client.start_session(headless=True)
+    #     response = await client('Hi, who are you?')
+    #     print("Single client response:\n", response)
+    # except Exception as e:
+    #     print("Error in single client example:", e)
 
+    # NEW implementation using DeepSeekFlow u ca use both versions
+    async with DeepSeekClient(**CONFIG) as client:
+        flow = DeepSeekFlow(client=client)
+        response = await flow.run_query("Who are u?")
+        print(response)
 
 async def multi_agent_example():
     """

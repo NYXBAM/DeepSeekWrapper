@@ -78,6 +78,15 @@ class DeepSeekClient(IWebDriverClient):
         self.page: Optional[Page] = None
         self.lock = asyncio.Lock()
 
+    async def __call__(self, message: str, use_search: bool = False):
+        return await self.send_message(message, use_search)
+
+    async def __aenter__(self):
+        await self.start_session()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        await self.close()
 
     async def click(self, selector: str) -> None:
         if not self.page: raise RuntimeError("Session not started.")
@@ -95,7 +104,7 @@ class DeepSeekClient(IWebDriverClient):
         if not self.page: raise RuntimeError("Session not started.")
         return self.page.locator(selector)
 
-    async def start_session(self, url=None, headless=False):
+    async def start_session(self, url=None, headless=True):
         if url is None:
             url = self.PROTECTED_PAGE_URL
         if not os.path.exists(self.STORAGE_STATE_PATH):
@@ -180,17 +189,24 @@ class DeepSeekClient(IWebDriverClient):
 
         return cleaned
     
-    async def send_message(self, message: str) -> str:
+    async def send_message(self, message: str, use_search: bool = False) -> str:
         async with self.lock:
             if not self.page:
                 raise RuntimeError("Session not started. Use start_session().")
 
             current_count = await (await self.locator(self.PARAGRAPH_SELECTOR)).count()
+            if use_search:
+                # search_btn = self.page.locator(self.SEARCH_TOGGLE_SELECTOR)
+                search_btn = self.page.get_by_role("button", name="Search")
+                if await search_btn.is_visible():
+                    await search_btn.click()
+                    await asyncio.sleep(0.5)
             input_field = self.page.get_by_placeholder(self.INPUT_PLACEHOLDER)
             send_button = self.page.locator(self.BUTTON_COMBO_SELECTOR)
 
             await input_field.fill(message)
-            await send_button.click()
+            # await send_button.click()
+            await input_field.press("Enter")
 
 
             response = await self.wait_for_stable_response(current_count)
