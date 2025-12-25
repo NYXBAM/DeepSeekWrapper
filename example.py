@@ -1,6 +1,7 @@
 import asyncio
-from client.ds_cli import DeepSeekClient, DeepSeekFlow
-from config import CONFIG
+# OLD IMPORTS
+# from client.ds_cli import DeepSeekClient, DeepSeekFlow
+from client import DeepSeekClient, DeepSeekFlow
 
 
 async def single_client_example():
@@ -18,7 +19,7 @@ async def single_client_example():
     #     print("Error in single client example:", e)
 
     # NEW implementation using DeepSeekFlow u ca use both versions
-    async with DeepSeekClient(**CONFIG) as client:
+    async with DeepSeekClient() as client:
         flow = DeepSeekFlow(client=client)
         response = await flow.run_query("Who are u?")
         print(response)
@@ -33,7 +34,7 @@ async def multi_agent_example():
 
     # Create multiple clients (agents) sharing the same browser
     agents = [
-        DeepSeekClient(external_browser=browser, **CONFIG)
+        DeepSeekClient(external_browser=browser)
         for _ in range(3)  # Number of agents
     ]
 
@@ -68,7 +69,7 @@ async def main():
     await single_client_example()
 
     # Run multi-agent example
-    await multi_agent_example()
+    # await multi_agent_example()
 
 
 if __name__ == '__main__':

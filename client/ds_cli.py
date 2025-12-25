@@ -52,25 +52,26 @@ class DeepSeekClient(IWebDriverClient):
     """
     def __init__(
         self,
-        storage_state_path: str,
-        protected_page_url: str,
-        paragraph_selector: str,
-        last_paragraph_selector: str,
-        input_placeholder: str,
-        button_combo_selector: str,
+        storage_state_path: str = None,
+        protected_page_url: str = None,
+        paragraph_selector: str = None,
+        last_paragraph_selector: str = None,
+        input_placeholder: str = None,
+        button_combo_selector: str = None,
         external_browser = None,
         timeout_seconds: int = 60,
         stability_delay: int = 10
     ):
-        self.external_browser = external_browser
-        self.STORAGE_STATE_PATH = storage_state_path
-        self.PROTECTED_PAGE_URL = protected_page_url
-        self.PARAGRAPH_SELECTOR = paragraph_selector
-        self.LAST_PARAGRAPH_SELECTOR = last_paragraph_selector
-        self.INPUT_PLACEHOLDER = input_placeholder
-        self.BUTTON_COMBO_SELECTOR = button_combo_selector
+        self.STORAGE_STATE_PATH = storage_state_path or config.CONFIG.get("storage_state_path")
+        self.PROTECTED_PAGE_URL = protected_page_url or config.CONFIG.get("protected_page_url")
+        self.PARAGRAPH_SELECTOR = paragraph_selector or config.CONFIG.get("paragraph_selector")
+        self.LAST_PARAGRAPH_SELECTOR = last_paragraph_selector or config.CONFIG.get("last_paragraph_selector")
+        self.INPUT_PLACEHOLDER = input_placeholder or config.CONFIG.get("input_placeholder")
+        self.BUTTON_COMBO_SELECTOR = button_combo_selector or config.CONFIG.get("button_combo_selector")
+        
         self.TIMEOUT_SECONDS = timeout_seconds
         self.STABILITY_DELAY = stability_delay
+        self.external_browser = external_browser
 
         self.playwright = None
         self.browser: Optional[Browser] = None
