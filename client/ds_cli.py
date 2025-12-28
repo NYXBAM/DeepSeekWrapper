@@ -2,9 +2,11 @@ import asyncio
 import os
 import re
 from abc import ABC, abstractmethod
+import time
 from playwright.async_api import async_playwright, Page, BrowserContext, Browser, TimeoutError
 from typing import Optional
 import logging
+from markdownify import markdownify as md
 
 import config
 
@@ -141,54 +143,103 @@ class DeepSeekClient(IWebDriverClient):
 
     # --- DeepSeek Logic Specific Methods ---
 
+    # async def wait_for_stable_response(self, start_paragraph_count: int) -> str:
+    #     if not self.page: raise RuntimeError("Session not started.")
+
+    #     new_paragraph = self.page.locator(self.PARAGRAPH_SELECTOR).nth(start_paragraph_count)
+        
+    #     try:
+    #         # Wait for the next paragraph element to appear
+    #         await new_paragraph.wait_for(state="visible", timeout=50000)
+    #     except TimeoutError:
+    #         return "\n Timed out waiting for a new response (50s timeout)."
+    #     except Exception as e:
+    #         return f"\nCritical error: {e}"
+
+    #     import time
+    #     start_time = time.time()
+    #     last_text = ""
+    #     stable_since = 0
+    #     last_paragraph = self.page.locator(self.LAST_PARAGRAPH_SELECTOR).last
+
+    #     while time.time() - start_time < self.TIMEOUT_SECONDS:
+    #         try:
+    #             current_text = await last_paragraph.inner_text()
+    #             if current_text != last_text:
+    #                 last_text = current_text
+    #                 stable_since = time.time()
+    #             if time.time() - stable_since >= self.STABILITY_DELAY and current_text != "":
+    #                 break
+    #             await asyncio.sleep(0.5)
+    #         except Exception:
+    #             await asyncio.sleep(0.5)
+    #             pass
+
+    #     if time.time() - start_time >= self.TIMEOUT_SECONDS:
+    #         return f"\nText did not stabilize within {self.TIMEOUT_SECONDS}s."
+
+    #     all_paragraphs = await self.page.locator(self.PARAGRAPH_SELECTOR).all_inner_texts()
+    #     new_response = "\n".join(all_paragraphs[start_paragraph_count:])
+            
+    #     elements = await self.page.locator(".ds-markdown pre code").all()
+    #     for i, el in enumerate(elements):
+    #         text = await el.inner_text()
+
+    #     cleaned = re.sub(r'<[^>]+>', '', new_response)
+    #     cleaned = re.sub(r'^```[a-zA-Z]*\n?', '', cleaned)
+    #     cleaned = re.sub(r'\n?```$', '', cleaned)
+    #     cleaned = cleaned.strip()
+
+    #     return cleaned
+    
+    
     async def wait_for_stable_response(self, start_paragraph_count: int) -> str:
-        if not self.page: raise RuntimeError("Session not started.")
+        if not self.page: 
+            raise RuntimeError("Session not started.")
 
         new_paragraph = self.page.locator(self.PARAGRAPH_SELECTOR).nth(start_paragraph_count)
         
         try:
-            # Wait for the next paragraph element to appear
             await new_paragraph.wait_for(state="visible", timeout=50000)
-        except TimeoutError:
-            return "\n Timed out waiting for a new response (50s timeout)."
         except Exception as e:
             return f"\nCritical error: {e}"
 
-        import time
         start_time = time.time()
-        last_text = ""
+        last_html = ""
         stable_since = 0
-        last_paragraph = self.page.locator(self.LAST_PARAGRAPH_SELECTOR).last
+    
+        response_container = self.page.locator(".ds-markdown").last
 
         while time.time() - start_time < self.TIMEOUT_SECONDS:
             try:
-                current_text = await last_paragraph.inner_text()
-                if current_text != last_text:
-                    last_text = current_text
+                
+                current_html = await response_container.inner_html()
+                
+                if current_html != last_html:
+                    last_html = current_html
                     stable_since = time.time()
-                if time.time() - stable_since >= self.STABILITY_DELAY and current_text != "":
+                
+                if time.time() - stable_since >= self.STABILITY_DELAY and current_html != "":
                     break
+                
                 await asyncio.sleep(0.5)
             except Exception:
                 await asyncio.sleep(0.5)
-                pass
 
         if time.time() - start_time >= self.TIMEOUT_SECONDS:
             return f"\nText did not stabilize within {self.TIMEOUT_SECONDS}s."
 
-        all_paragraphs = await self.page.locator(self.PARAGRAPH_SELECTOR).all_inner_texts()
-        new_response = "\n".join(all_paragraphs[start_paragraph_count:])
-            
-        elements = await self.page.locator(".ds-markdown pre code").all()
-        for i, el in enumerate(elements):
-            text = await el.inner_text()
+        
+        final_html = await response_container.inner_html()
+        cleaned = md(
+            final_html,
+            heading_style="ATX",  
+            bullets="-",         
+            code_language_callback=lambda el: el.get('class', '').replace('language-', '') if el.get('class') else None
+        )
 
-        cleaned = re.sub(r'<[^>]+>', '', new_response)
-        cleaned = re.sub(r'^```[a-zA-Z]*\n?', '', cleaned)
-        cleaned = re.sub(r'\n?```$', '', cleaned)
-        cleaned = cleaned.strip()
-
-        return cleaned
+        return cleaned.strip()
+        
     
     async def send_message(self, message: str, use_search: bool = False) -> str:
         async with self.lock:
