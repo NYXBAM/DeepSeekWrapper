@@ -62,7 +62,7 @@ source .venv/bin/activate
 poetry run playwright install firefox
 # create .env 
 nano .env
-
+#
 # put u login and password in .env 
 # DEEPSEEK_LOGIN=
 # DEEPSEEK_PASSWORD=
