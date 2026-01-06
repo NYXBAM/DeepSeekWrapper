@@ -8,7 +8,10 @@ from typing import Optional
 import logging
 from markdownify import markdownify as md
 
-import config
+try:
+    from DeepSeekWrapper import config
+except:
+    import config
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +64,7 @@ class DeepSeekClient(IWebDriverClient):
         input_placeholder: str = None,
         button_combo_selector: str = None,
         external_browser = None,
-        timeout_seconds: int = 60,
+        timeout_seconds: int = 120,
         stability_delay: int = 10
     ):
         self.STORAGE_STATE_PATH = storage_state_path or config.CONFIG.get("storage_state_path")
