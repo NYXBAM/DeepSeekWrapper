@@ -8,6 +8,7 @@ from .ds_cli import DeepSeekClient
 from playwright.async_api import async_playwright
 import logging
 
+from DeepSeekWrapper import config
 
 
 logger = logging.getLogger(__name__)
@@ -32,7 +33,8 @@ class Auth(DeepSeekClient):
         self.USER_INPUT_PLACEHOLDER = user_input_placeholder
         self.PASSWORD_INPUT_PLACEHOLDER = password_input_placeholder
         self.UNIQUE_CLASS = unique_class
-        
+
+    
     async def login(self):
         playwright_auth = None
         browser_auth = None
@@ -41,8 +43,12 @@ class Auth(DeepSeekClient):
             
             logger.info('<==> Trying log in DeepSeek <==>')
             playwright_auth = await async_playwright().start()
-
-            browser_auth = await playwright_auth.firefox.launch(headless=True) 
+            # todo
+            if config.BROWSER_TYPE == 'firefox':
+                browser_auth = await playwright_auth.firefox.launch(headless=True) 
+            if config.BROWSER_TYPE == 'chromium':
+                browser_auth = await playwright_auth.chromium.launch(headless=True) 
+            
             context_auth = await browser_auth.new_context()
             page_auth = await context_auth.new_page()
 

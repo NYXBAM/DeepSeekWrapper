@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 
 
 load_dotenv()
-
+BROWSER_TYPE = "firefox"
 
 CONFIG = {
         "storage_state_path": "storage/storage_state.json",

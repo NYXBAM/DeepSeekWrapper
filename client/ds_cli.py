@@ -8,7 +8,9 @@ from typing import Optional
 import logging
 from markdownify import markdownify as md
 
-import config
+
+# import config
+from DeepSeekWrapper import config
 
 logger = logging.getLogger(__name__)
 
@@ -61,8 +63,10 @@ class DeepSeekClient(IWebDriverClient):
         input_placeholder: str = None,
         button_combo_selector: str = None,
         external_browser = None,
-        timeout_seconds: int = 60,
-        stability_delay: int = 10
+        timeout_seconds: int = 240,
+        stability_delay: int = 10,
+        use_search: bool = False,
+
     ):
         self.STORAGE_STATE_PATH = storage_state_path or config.CONFIG.get("storage_state_path")
         self.PROTECTED_PAGE_URL = protected_page_url or config.CONFIG.get("protected_page_url")
@@ -80,7 +84,8 @@ class DeepSeekClient(IWebDriverClient):
         self.context: Optional[BrowserContext] = None
         self.page: Optional[Page] = None
         self.lock = asyncio.Lock()
-
+        self.USE_SEARCH = use_search
+        
     async def __call__(self, message: str, use_search: bool = False):
         return await self.send_message(message, use_search)
 
@@ -118,7 +123,8 @@ class DeepSeekClient(IWebDriverClient):
             
         if self.external_browser is None:
             self.playwright = await async_playwright().start()
-            self.browser = await self.playwright.firefox.launch(headless=headless)
+            self.browser = await launch_browser(self.playwright, config.BROWSER_TYPE, headless=headless)
+            # self.browser = await self.playwright.firefox.launch(headless=headless)
         else:
             self.browser = self.external_browser
             
@@ -129,7 +135,12 @@ class DeepSeekClient(IWebDriverClient):
     @classmethod
     async def create_browser(cls, headless=True):
         pw = await async_playwright().start()
-        browser = await pw.firefox.launch(headless=headless)
+        # browser = await pw.firefox.launch(headless=headless)
+        browser = await launch_browser(
+            pw,
+            config.BROWSER_TYPE,
+            headless=headless
+        )
         return pw, browser
 
     async def close(self):
@@ -191,13 +202,13 @@ class DeepSeekClient(IWebDriverClient):
         return cleaned.strip()
         
     
-    async def send_message(self, message: str, use_search: bool = False) -> str:
+    async def send_message(self, message: str) -> str:
         async with self.lock:
             if not self.page:
                 raise RuntimeError("Session not started. Use start_session().")
 
             current_count = await (await self.locator(self.PARAGRAPH_SELECTOR)).count()
-            if use_search:
+            if self.USE_SEARCH:
                 # search_btn = self.page.locator(self.SEARCH_TOGGLE_SELECTOR)
                 search_btn = self.page.get_by_role("button", name="Search")
                 if await search_btn.is_visible():
@@ -224,3 +235,10 @@ class DeepSeekFlow:
     async def run_query(self, query: str) -> str:
         return await self.client.send_message(query)
 
+
+async def launch_browser(playwright, browser_type: str, **kwargs):
+    browser_type_obj = getattr(playwright, browser_type, None)
+    if not browser_type_obj:
+        raise ValueError(f"Unknown browser type {browser_type}")
+    return await browser_type_obj.launch(**kwargs)
+        
