@@ -8,9 +8,10 @@ from typing import Optional
 import logging
 from markdownify import markdownify as md
 
-
-# import config
-from DeepSeekWrapper import config
+try:
+    from DeepSeekWrapper import config
+except:
+    import config
 
 logger = logging.getLogger(__name__)
 
@@ -63,10 +64,15 @@ class DeepSeekClient(IWebDriverClient):
         input_placeholder: str = None,
         button_combo_selector: str = None,
         external_browser = None,
+<<<<<<< HEAD
         timeout_seconds: int = 240,
         stability_delay: int = 10,
         use_search: bool = False,
 
+=======
+        timeout_seconds: int = 120,
+        stability_delay: int = 10
+>>>>>>> 5a1a4b799fa288f78f083b8c43bbb5c19797c30c
     ):
         self.STORAGE_STATE_PATH = storage_state_path or config.CONFIG.get("storage_state_path")
         self.PROTECTED_PAGE_URL = protected_page_url or config.CONFIG.get("protected_page_url")
