@@ -8,8 +8,10 @@ from .ds_cli import DeepSeekClient
 from playwright.async_api import async_playwright
 import logging
 
-from DeepSeekWrapper import config
-
+try:
+    from DeepSeekWrapper import config
+except:
+    import config
 
 logger = logging.getLogger(__name__)
 
@@ -45,9 +47,20 @@ class Auth(DeepSeekClient):
             playwright_auth = await async_playwright().start()
             # todo
             if config.BROWSER_TYPE == 'firefox':
-                browser_auth = await playwright_auth.firefox.launch(headless=True) 
+                browser_auth = await playwright_auth.firefox.launch(
+                    headless=False
+                )
             if config.BROWSER_TYPE == 'chromium':
-                browser_auth = await playwright_auth.chromium.launch(headless=True) 
+                browser_auth = await playwright_auth.chromium.launch(
+                    executable_path='/usr/bin/chromium',
+                    headless=True,
+                    args=[
+                        '--no-sandbox',                
+                        '--disable-setuid-sandbox',    
+                        '--disable-dev-shm-usage',     
+                        '--gpu-sandbox-failures-fatal=no',
+                        '--disable-gpu'               
+                        ]) 
             
             context_auth = await browser_auth.new_context()
             page_auth = await context_auth.new_page()

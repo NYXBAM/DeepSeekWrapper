@@ -124,12 +124,24 @@ class DeepSeekClient(IWebDriverClient):
             
         if self.external_browser is None:
             self.playwright = await async_playwright().start()
-            self.browser = await launch_browser(self.playwright, config.BROWSER_TYPE, headless=headless)
+            self.browser = await launch_browser(self.playwright, config.BROWSER_TYPE, headless=headless, 
+                                            # executable_path='/usr/bin/chromium',
+                                            args=[
+                                                '--no-sandbox',                
+                                                '--disable-setuid-sandbox',    
+                                                '--disable-dev-shm-usage',     
+                                                '--gpu-sandbox-failures-fatal=no',
+                                                '--disable-gpu'               
+                                                ])  
             # self.browser = await self.playwright.firefox.launch(headless=headless)
         else:
             self.browser = self.external_browser
             
-        self.context = await self.browser.new_context(storage_state=self.STORAGE_STATE_PATH)
+        context_args = {}
+        if os.path.exists(self.STORAGE_STATE_PATH):
+            context_args["storage_state"] = self.STORAGE_STATE_PATH
+            
+        self.context = await self.browser.new_context(**context_args)
         self.page = await self.context.new_page()
         await self.page.goto(url)
     
@@ -140,7 +152,16 @@ class DeepSeekClient(IWebDriverClient):
         browser = await launch_browser(
             pw,
             config.BROWSER_TYPE,
-            headless=headless
+            headless=headless,
+            # executable_path='/usr/bin/chromium',
+            args=[
+                '--no-sandbox',                
+                '--disable-setuid-sandbox',    
+                '--disable-dev-shm-usage',     
+                '--gpu-sandbox-failures-fatal=no',
+                '--disable-gpu'
+                ]
+            
         )
         return pw, browser
 
