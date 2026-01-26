@@ -49,6 +49,8 @@ It provides:
 
 ## Installation
 
+### **For use API, u need install Redis https://redis.io/**
+
 ```bash
 git clone https://github.com/NYXBAM/DeepSeekWrapper.git
 cd DeepSeekWrapper
@@ -74,6 +76,66 @@ nano .env
 
 ---
 
+## API Reference
+
+### 1. Create Standard Query
+
+**Endpoint:** `POST /query`
+
+**Description:** Submits a text prompt to the standard DeepSeek model.
+
+- **Request Body:**
+    
+    JSON
+    
+    ```
+    {
+      "prompt": "Explain quantum physics to a five-year-old."
+    }
+    ```
+    
+- **Success Response (201 Created):**
+    
+    JSON
+    
+    ```
+    {
+      "task_id": "550e8400-e29b-41d4-a716-446655440000",
+      "status": "Queued"
+    }
+    ```
+    
+- **Error (503):** Returns if the worker service is down or overloaded.
+    
+
+### 2. Create Web-Search Query
+
+**Endpoint:** `POST /web/query`
+
+**Description:** Same as above, but triggers a task that allows the model to search the web for real-time information.
+
+- **Request Body:** Same as standard query.
+    
+- **Success Response:** Same as standard query.
+    
+
+### 3. Get Task Result
+
+**Endpoint:** `GET /result/{task_id}`
+
+**Description:** Checks the current state of your task and retrieves the result.
+
+- **Parameters:** `task_id` (string)
+    
+- **Response Fields:**
+    
+    - `status`: The current state (e.g., `PENDING`, `STARTED`, `SUCCESS`, `FAILURE`).
+        
+    - `result`: Contains the model's response if the status is `SUCCESS`. Otherwise, it returns `null`.
+
+
+#### Response will return in raw(md) and clean (plain text) format
+        
 ## Basic Usage — Single Client
 
 ```python
