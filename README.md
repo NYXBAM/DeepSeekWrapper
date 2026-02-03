@@ -76,6 +76,27 @@ nano .env
 
 ---
 
+## DOCKER (FOR API):
+
+
+Don't forget for small changes in client/api/v1/worker_celery.py use redis instead localhost
+```python
+# USE redis://redis:6379/0 and redis://redis:6379/1
+celery_app = Celery(
+     "tasks",
+     broker="redis://redis:6379/0",
+     backend="redis://redis:6379/1",
+     include=['client.api.v1.tasks']
+)
+```
+
+```
+# create and configure your .env
+# run 
+docker-compose up --build -d
+```
+
+
 ## API Reference
 
 ### 1. Create Standard Query
